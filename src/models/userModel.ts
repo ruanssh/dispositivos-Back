@@ -1,6 +1,6 @@
 import admin from '../config/firebaseConfig';
 import { transporter } from '../config/mailer';
-import { SchoolData } from './schoolDataModel';
+import SchoolDataModel,{ SchoolData } from './schoolDataModel';
 
 // Definição da interface para o modelo de usuário
 export interface User {
@@ -24,6 +24,7 @@ export interface User {
     createdAt: string;
     id?: string;
     type: 'professor' | 'student';
+    classId: string;
 }
 
 // Referência para o nó de usuários no banco de dados
@@ -140,4 +141,36 @@ export default class UserModel {
         `,
         });
     }
+    static async getMateriasByUserId(userId: string): Promise<string[] | null> {
+    // 1. Buscar o usuário
+    const snapshot = await usersRef.child(userId).once("value");
+    if (!snapshot.exists()) return null;
+    const userData = snapshot.val();
+
+    // 2. Pegar o classId do usuário
+    const classId = userData.classId;
+    if (!classId) return null;
+
+    // 3. Buscar a turma pelo classId
+    const schoolData = await SchoolDataModel.getSchoolDataById(classId);
+    if (!schoolData) return null;
+
+    // 4. Mapear os nomes das matérias (courses)
+    const materias: string[] = [];
+    if (schoolData.courseList) {
+        for (const course of schoolData.courseList) {
+            if (course.classList) {
+                for (const cls of course.classList) {
+                    if (cls.id === classId) {
+                        materias.push(course.name); // adiciona o nome do curso/matéria
+                    }
+                }
+            }
+        }
+    }
+
+    return materias.length > 0 ? materias : null;
+}
+
+
 }
